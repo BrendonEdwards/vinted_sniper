@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getTrackedUrls, getRecentItemIds, addTrackedItem } from "@/lib/database"
+import * as cheerio from "cheerio"
 
 // This would be called by a cron job or webhook
 export async function POST(request: NextRequest) {
@@ -43,25 +44,64 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Placeholder function - in reality, you'd need proper web scraping
-// This would require handling CORS, anti-bot measures, etc.
+// Basic scraping implementation using fetch and cheerio
+// This parses the Vinted search results page and returns the first
+// two items found. It is intentionally simple and may require
+// adjustments if Vinted changes their markup or introduces additional
+// anti scraping measures.
+
 async function scrapeVintedUrl(url: string) {
-  // This is a simplified placeholder
-  // In a real implementation, you'd use a service like:
-  // - Puppeteer/Playwright for browser automation
-  // - A proxy service to avoid blocking
-  // - Proper parsing of Vinted's HTML structure
-
-  console.log(`Would scrape: ${url}`)
-
-  // Return mock data for demonstration
-  return [
-    {
-      item_id: `mock_${Date.now()}`,
-      title: "Sample Item",
-      subtitle: "Size M",
-      price: "£25.00",
-      item_url: "https://www.vinted.co.uk/items/sample",
+  const res = await fetch(url, {
+    headers: {
+      // Pretend to be a regular browser to avoid easy blocking
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
     },
-  ]
+  })
+
+  if (!res.ok) {
+    throw new Error(`Request failed with status ${res.status}`)
+  }
+
+  const html = await res.text()
+  const $ = cheerio.load(html)
+  const items: {
+    item_id: string
+    title?: string
+    subtitle?: string
+    price?: string
+    item_url?: string
+  }[] = []
+
+  $("div.feed-grid__item").each((i, el) => {
+    if (i >= 2) return false
+
+    const container = $(el).find("div.new-item-box__container")
+    if (!container.length) return
+
+    const dataTestId = container.attr("data-testid") || ""
+    const itemId = dataTestId.split("-").pop() || ""
+
+    let itemUrl = container.find("a[href]").attr("href") || ""
+    if (itemUrl && !itemUrl.startsWith("http")) {
+      itemUrl = `https://www.vinted.co.uk${itemUrl}`
+    }
+
+    const title = container
+      .find("p[data-testid$='--description-title']")
+      .text()
+      .trim()
+    const subtitle = container
+      .find("p[data-testid$='--description-subtitle']")
+      .text()
+      .trim()
+    const price = container
+      .find("p[data-testid$='--price-text']")
+      .text()
+      .trim()
+
+    items.push({ item_id: itemId, title, subtitle, price, item_url: itemUrl })
+  })
+
+  return items
 }
