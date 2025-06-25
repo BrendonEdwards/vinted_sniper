@@ -6,7 +6,8 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "cron": "node scripts/cron-check-items.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -42,6 +43,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "latest",
+    "cheerio": "^1.0.0-rc.12",
     "date-fns": "4.1.0",
     "embla-carousel-react": "latest",
     "input-otp": "latest",
